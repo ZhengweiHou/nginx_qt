@@ -2,3 +2,4 @@
 objs
 *.pro.user
 Makefile
+.qmake.stash
