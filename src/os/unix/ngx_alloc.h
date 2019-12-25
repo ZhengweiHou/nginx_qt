@@ -12,8 +12,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
-
+// 分配内存
 void *ngx_alloc(size_t size, ngx_log_t *log);
+// 分配内存并全重置为0
 void *ngx_calloc(size_t size, ngx_log_t *log);
 
 #define ngx_free          free

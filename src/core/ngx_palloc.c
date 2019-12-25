@@ -14,21 +14,23 @@ static ngx_inline void *ngx_palloc_small(ngx_pool_t *pool, size_t size,
 static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
 static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
-
+// 创建内存池
 ngx_pool_t *
 ngx_create_pool(size_t size, ngx_log_t *log)
 {
     ngx_pool_t  *p;
 
+    // 分配一块内存 相当于ngx_alloc(size, log)
     p = ngx_memalign(NGX_POOL_ALIGNMENT, size, log);
     if (p == NULL) {
         return NULL;
     }
 
+    // 未使用内存开始位置 = 分配内存块指针位置 + 内存池结构体大小 （内存块头部存ngx_pool_t的数据结构体）
     p->d.last = (u_char *) p + sizeof(ngx_pool_t);
-    p->d.end = (u_char *) p + size;
-    p->d.next = NULL;
-    p->d.failed = 0;
+    p->d.end = (u_char *) p + size; // 内存池结束地址
+    p->d.next = NULL;   // 初始没有子节点，可以通过ngx_palloc_block扩容
+    p->d.failed = 0;    // 失败次数（ngx_palloc_block内会控制该值不会大于4）
 
     size = size - sizeof(ngx_pool_t);
     p->max = (size < NGX_MAX_ALLOC_FROM_POOL) ? size : NGX_MAX_ALLOC_FROM_POOL;
@@ -42,7 +44,7 @@ ngx_create_pool(size_t size, ngx_log_t *log)
     return p;
 }
 
-
+// 销毁内存池
 void
 ngx_destroy_pool(ngx_pool_t *pool)
 {
@@ -95,7 +97,7 @@ ngx_destroy_pool(ngx_pool_t *pool)
     }
 }
 
-
+// 重置内存池
 void
 ngx_reset_pool(ngx_pool_t *pool)
 {
@@ -118,7 +120,7 @@ ngx_reset_pool(ngx_pool_t *pool)
     pool->large = NULL;
 }
 
-
+// 使用内存池分配一块内存（有对齐操作ngx_align_ptr）
 void *
 ngx_palloc(ngx_pool_t *pool, size_t size)
 {
@@ -131,7 +133,7 @@ ngx_palloc(ngx_pool_t *pool, size_t size)
     return ngx_palloc_large(pool, size);
 }
 
-
+// 使用内存池分配一块内存
 void *
 ngx_pnalloc(ngx_pool_t *pool, size_t size)
 {
@@ -145,6 +147,7 @@ ngx_pnalloc(ngx_pool_t *pool, size_t size)
 }
 
 
+// 分配内存(当请求内存大小小于pool->max限制)，由上两个方法调用 align=[1|对齐,0|非对齐]
 static ngx_inline void *
 ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
 {
@@ -153,13 +156,16 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
 
     p = pool->current;
 
+    // 遍历内存池链p->next各个节点
     do {
         m = p->d.last;
 
         if (align) {
+            // 对齐操作,会损失内存，但是提高内存使用速度 FIXME 这是什么操作??
             m = ngx_align_ptr(m, NGX_ALIGNMENT);
         }
 
+         // 若某节点剩余空间满足分配，则返回节点指针
         if ((size_t) (p->d.end - m) >= size) {
             p->d.last = m + size;
 
@@ -170,10 +176,12 @@ ngx_palloc_small(ngx_pool_t *pool, size_t size, ngx_uint_t align)
 
     } while (p);
 
+    // 所有节点都无足够空间分配时，重新申请一个缓存池节点
     return ngx_palloc_block(pool, size);
 }
 
 
+// 内存池链扩容（分配添加新节点）
 static void *
 ngx_palloc_block(ngx_pool_t *pool, size_t size)
 {
@@ -183,6 +191,7 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
 
     psize = (size_t) (pool->d.end - (u_char *) pool);
 
+    // 分配内存
     m = ngx_memalign(NGX_POOL_ALIGNMENT, psize, pool->log);
     if (m == NULL) {
         return NULL;
@@ -195,9 +204,10 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
     new->d.failed = 0;
 
     m += sizeof(ngx_pool_data_t);
-    m = ngx_align_ptr(m, NGX_ALIGNMENT);
+    m = ngx_align_ptr(m, NGX_ALIGNMENT);    // 可用空间对齐一下
     new->d.last = m + size;
 
+    // ？？？？？控制当前链长度不大于4？？？？failed的值在哪会被修改？？？
     for (p = pool->current; p->d.next; p = p->d.next) {
         if (p->d.failed++ > 4) {
             pool->current = p->d.next;

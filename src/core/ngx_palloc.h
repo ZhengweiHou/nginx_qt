@@ -31,37 +31,39 @@ typedef void (*ngx_pool_cleanup_pt)(void *data);
 
 typedef struct ngx_pool_cleanup_s  ngx_pool_cleanup_t;
 
+// 自定义清理回调函数数据结构
 struct ngx_pool_cleanup_s {
-    ngx_pool_cleanup_pt   handler;
-    void                 *data;
-    ngx_pool_cleanup_t   *next;
+    ngx_pool_cleanup_pt   handler;  // 清理的回调函数
+    void                 *data;     // 指向需要清理的内存数据地址
+    ngx_pool_cleanup_t   *next;     // 下一个ngx_pool_cleanup_t
 };
 
 
 typedef struct ngx_pool_large_s  ngx_pool_large_t;
 
+// 存储大数据的链表
 struct ngx_pool_large_s {
-    ngx_pool_large_t     *next;
-    void                 *alloc;
+    ngx_pool_large_t     *next;     // 指向下一个存储地址，通过这个地址可以知道当前块长度
+    void                 *alloc;    // 数据块指针
 };
 
-
+// 内存池数据区域
 typedef struct {
-    u_char               *last;
-    u_char               *end;
-    ngx_pool_t           *next;
-    ngx_uint_t            failed;
+    u_char               *last;     // 内存池中未使用内存的开始节点地址
+    u_char               *end;      // 内存池的结束地址
+    ngx_pool_t           *next;     // 指向下一个内存池
+    ngx_uint_t            failed;   // 失败次数
 } ngx_pool_data_t;
 
-
+//Nginx 内存池主数据结构
 struct ngx_pool_s {
-    ngx_pool_data_t       d;
-    size_t                max;
-    ngx_pool_t           *current;
-    ngx_chain_t          *chain;
-    ngx_pool_large_t     *large;
-    ngx_pool_cleanup_t   *cleanup;
-    ngx_log_t            *log;
+    ngx_pool_data_t       d;        // 内存池数据区域
+    size_t                max;      // 最大每次可分配内存(申请内存大于该值时，会单独分配一块large)
+    ngx_pool_t           *current;  // 指向当前的内存池指针地址。ngx_pool_t链表上最后一个缓存池结构
+    ngx_chain_t          *chain;    // 缓冲区链表
+    ngx_pool_large_t     *large;    // 存储大数据的链表
+    ngx_pool_cleanup_t   *cleanup;  // 可自定义回调函数，清除内存块分配的内存
+    ngx_log_t            *log;      // 日志
 };
 
 
@@ -71,12 +73,16 @@ typedef struct {
     ngx_log_t            *log;
 } ngx_pool_cleanup_file_t;
 
-
+// 创建内存池
 ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
+// 销毁内存池
 void ngx_destroy_pool(ngx_pool_t *pool);
+// 重置内存池
 void ngx_reset_pool(ngx_pool_t *pool);
 
+// 使用内存池分配一块内存（有对齐操作ngx_align_ptr）
 void *ngx_palloc(ngx_pool_t *pool, size_t size);
+// 使用内存池分配一块内存
 void *ngx_pnalloc(ngx_pool_t *pool, size_t size);
 void *ngx_pcalloc(ngx_pool_t *pool, size_t size);
 void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment);
