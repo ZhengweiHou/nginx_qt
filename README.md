@@ -2,8 +2,11 @@
 nginx源码调试项目，使用Qt Creator
 
 `cd [当前项目根目录]`
+
 `. auto/configure --prefix=[当前项目根目录]`
+
 若有错误，自行安装相关依赖包
+
 `make`
 
 
