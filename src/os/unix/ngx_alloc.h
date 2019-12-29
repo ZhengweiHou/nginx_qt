@@ -18,7 +18,12 @@ void *ngx_alloc(size_t size, ngx_log_t *log);
 void *ngx_calloc(size_t size, ngx_log_t *log);
 
 #define ngx_free          free
-
+/*
+ * free是释放，意思是告诉系统，给我的这块RAM我用完了，不再用了，系统可以把它干别的了
+ * free之后，系统还没有拿这块RAM干别的事之前，这块RAM的内容可能是不会变的，
+ * 依然可以读出原来的内容，因为你的指针a还是指向这块RAM。但要注意，这块RAM
+ * 已经不属于你了，读一下内容无所谓，如果往里面写就很危险了
+*/
 
 /*
  * Linux has memalign() or posix_memalign()
